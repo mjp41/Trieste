@@ -4,7 +4,11 @@ project(trieste VERSION 1.0.0 LANGUAGES CXX)
 include(FetchContent)
 
 set(BUILD_TESTING OFF CACHE INTERNAL "Turn off snmalloc tests")
-set(SNMALLOC_STATIC_LIBRARY_PREFIX "")
+if (MSVC)
+  # Overriding malloc and free statically not supported on Windows.
+else()
+  set(SNMALLOC_STATIC_LIBRARY_PREFIX "")
+endif()
 set(RE2_BUILD_TESTING OFF CACHE INTERNAL "Turn off RE2 tests")
 
 FetchContent_Declare(
