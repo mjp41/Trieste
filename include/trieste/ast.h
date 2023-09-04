@@ -202,6 +202,14 @@ namespace trieste
       return children.at(index);
     }
 
+    size_t indexof()
+    {
+      if (!parent_)
+        return 0;
+
+      return parent_->find(shared_from_this()) - parent_->begin();
+    }
+
     Node& front()
     {
       return children.front();
