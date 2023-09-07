@@ -64,10 +64,7 @@ namespace trieste
         return false;
       }
 
-      virtual bool match(NodeIt&, NodeIt, Match&) const
-      {
-        return false;
-      }
+      virtual bool match(NodeIt&, NodeIt, Match&) const = 0;
     };
 
     using PatternPtr = std::shared_ptr<PatternDef>;
@@ -180,7 +177,10 @@ namespace trieste
       P pattern;
 
     public:
-      Rep(P pattern) : pattern(pattern) {}
+      Rep(P pattern) : pattern(pattern)
+      {
+        pattern.set_in_rep();
+      }
 
       bool custom_rep() const override
       {
@@ -549,11 +549,12 @@ namespace trieste
       P pattern;
 
     public:
-      Pattern(P pattern) : pattern(std::move(pattern)) {}
+      Pattern(P pattern) : pattern(pattern) {}
 
       operator PatternPtr() const
       {
-        return std::make_shared<PatternDef>(pattern);
+
+        return std::make_shared<P>(pattern);
       }
 
       SNMALLOC_FAST_PATH bool match(NodeIt& it, NodeIt end, Match& match) const
@@ -651,17 +652,17 @@ namespace trieste
 
   inline detail::Pattern<detail::TokenMatch> T(const Token& type)
   {
-    return {type};
+    return {{type}};
   }
 
   inline detail::Pattern<detail::RegexMatch> T(const Token& type, const std::string& r)
   {
-    return {detail::RegexMatch(type, r)};
+    return {{type, r}};
   }
 
   inline detail::Pattern<detail::Inside> In(const Token& type)
   {
-    return {type};
+    return {{type}};
   }
 
   template<typename... Ts>
@@ -669,7 +670,7 @@ namespace trieste
   In(const Token& type1, const Token& type2, const Ts&... types)
   {
     std::vector<Token> t = {type1, type2, types...};
-    return {t};
+    return {{t}};
   }
 
   inline detail::EphemeralNode operator-(Node node)
