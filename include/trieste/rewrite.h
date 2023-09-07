@@ -66,14 +66,15 @@ namespace trieste
 
     using PatternPtr = std::shared_ptr<PatternDef>;
 
+    template <typename P>
     class Cap : public PatternDef
     {
     private:
       Token name;
-      PatternPtr pattern;
+      std::shared_ptr<P> pattern;
 
     public:
-      Cap(const Token& name, PatternPtr pattern) : name(name), pattern(pattern)
+      Cap(const Token& name, std::shared_ptr<P> pattern) : name(name), pattern(pattern)
       {}
 
       bool match(NodeIt& it, NodeIt end, Match& match) const override
@@ -146,13 +147,14 @@ namespace trieste
       }
     };
 
+    template <typename P>
     class Opt : public PatternDef
     {
     private:
-      PatternPtr pattern;
+      std::shared_ptr<P> pattern;
 
     public:
-      Opt(PatternPtr pattern) : pattern(pattern) {}
+      Opt(P pattern) : pattern(pattern) {}
 
       bool match(NodeIt& it, NodeIt end, Match& match) const override
       {
@@ -165,13 +167,14 @@ namespace trieste
       }
     };
 
+    template <typename P>
     class Rep : public PatternDef
     {
     private:
-      PatternPtr pattern;
+      std::shared_ptr<P> pattern;
 
     public:
-      Rep(PatternPtr pattern) : pattern(pattern) {}
+      Rep(std::shared_ptr<P> pattern) : pattern(pattern) {}
 
       bool custom_rep() override
       {
@@ -181,19 +184,23 @@ namespace trieste
 
       bool match(NodeIt& it, NodeIt end, Match& match) const override
       {
+        if (pattern->custom_rep())
+          return pattern->match(it, end, match);
+
         while ((it != end) && pattern->match(it, end, match))
           ;
         return true;
       }
     };
 
+    template <typename P>
     class Not : public PatternDef
     {
     private:
-      PatternPtr pattern;
+      std::shared_ptr<P> pattern;
 
     public:
-      Not(PatternPtr pattern) : pattern(pattern) {}
+      Not(std::shared_ptr<P> pattern) : pattern(pattern) {}
 
       bool match(NodeIt& it, NodeIt end, Match& match) const override
       {
@@ -214,14 +221,15 @@ namespace trieste
       }
     };
 
+    template <typename P1, typename P2>
     class Seq : public PatternDef
     {
     private:
-      PatternPtr first;
-      PatternPtr second;
+      std::shared_ptr<P1> first;
+      std::shared_ptr<P2> second;
 
     public:
-      Seq(PatternPtr first, PatternPtr second) : first(first), second(second) {}
+      Seq(std::shared_ptr<P1> first, std::shared_ptr<P2> second) : first(first), second(second) {}
 
       bool match(NodeIt& it, NodeIt end, Match& match) const override
       {
@@ -242,14 +250,15 @@ namespace trieste
       }
     };
 
+    template <typename P1, typename P2>
     class Choice : public PatternDef
     {
     private:
-      PatternPtr first;
-      PatternPtr second;
+      std::shared_ptr<P1> first;
+      std::shared_ptr<P2> second;
 
     public:
-      Choice(PatternPtr first, PatternPtr second) : first(first), second(second)
+      Choice(std::shared_ptr<P1> first, std::shared_ptr<P2> second) : first(first), second(second)
       {}
 
       bool match(NodeIt& it, NodeIt end, Match& match) const override
@@ -388,14 +397,15 @@ namespace trieste
       }
     };
 
+    template <typename P, typename C>
     class Children : public PatternDef
     {
     private:
-      PatternPtr pattern;
-      PatternPtr children;
+      std::shared_ptr<P> pattern;
+      std::shared_ptr<C> children;
 
     public:
-      Children(PatternPtr pattern, PatternPtr children)
+      Children(std::shared_ptr<P> pattern, std::shared_ptr<C> children)
       : pattern(pattern), children(children)
       {}
 
@@ -421,13 +431,14 @@ namespace trieste
       }
     };
 
+    template <typename P>
     class Pred : public PatternDef
     {
     private:
-      PatternPtr pattern;
+      std::shared_ptr<P> pattern;
 
     public:
-      Pred(PatternPtr pattern) : pattern(pattern) {}
+      Pred(std::shared_ptr<P> pattern) : pattern(pattern) {}
 
       bool custom_rep() override
       {
@@ -445,13 +456,14 @@ namespace trieste
       }
     };
 
+    template <typename P>
     class NegPred : public PatternDef
     {
     private:
-      PatternPtr pattern;
+      std::shared_ptr<P> pattern;
 
     public:
-      NegPred(PatternPtr pattern) : pattern(pattern) {}
+      NegPred(std::shared_ptr<P> pattern) : pattern(pattern) {}
 
       bool custom_rep() override
       {
@@ -471,14 +483,16 @@ namespace trieste
 
     using ActionFn = std::function<bool(const NodeRange&)>;
 
+    // TODO carry lambda term type here too.
+    template <typename P>
     class Action : public PatternDef
     {
     private:
       ActionFn action;
-      PatternPtr pattern;
+      std::shared_ptr<P> pattern;
 
     public:
-      Action(ActionFn action, PatternPtr pattern)
+      Action(ActionFn action, std::shared_ptr<P> pattern)
       : action(action), pattern(pattern)
       {}
 
@@ -501,78 +515,87 @@ namespace trieste
       }
     };
 
+    template <typename P>
     class Pattern;
 
     template<typename T>
     using Effect = std::function<T(Match&)>;
 
     template<typename T>
-    using PatternEffect = std::pair<Pattern, Effect<T>>;
+    using PatternEffect = std::pair<PatternPtr, Effect<T>>;
 
+    template <typename P>
     class Pattern
     {
+      template <typename P1>
+      friend class Pattern;
     private:
-      PatternPtr pattern;
+      std::shared_ptr<P> pattern;
 
     public:
-      Pattern(PatternPtr pattern) : pattern(pattern) {}
+      Pattern(std::shared_ptr<P> pattern) : pattern(pattern) {}
+
+      operator PatternPtr() const
+      {
+        return pattern;
+      }
 
       bool match(NodeIt& it, NodeIt end, Match& match) const
       {
         return pattern->match(it, end, match);
       }
 
-      Pattern operator()(ActionFn action) const
+      Pattern<Action<P>> operator()(ActionFn action) const
       {
-        return {std::make_shared<Action>(action, pattern)};
+        return {std::make_shared<Action<P>>(action, pattern)};
       }
 
-      Pattern operator[](const Token& name) const
+      Pattern<Cap<P>> operator[](const Token& name) const
       {
-        return {std::make_shared<Cap>(name, pattern)};
+        return {std::make_shared<Cap<P>>(name, pattern)};
       }
 
-      Pattern operator~() const
+      Pattern<Opt<P>> operator~() const
       {
         return {std::make_shared<Opt>(pattern)};
       }
 
-      Pattern operator++() const
+      Pattern<Pred<P>> operator++() const
       {
         return {std::make_shared<Pred>(pattern)};
       }
 
-      Pattern operator--() const
+      Pattern<NegPred<P>> operator--() const
       {
         return {std::make_shared<NegPred>(pattern)};
       }
 
-      Pattern operator++(int) const
+      Pattern<Rep<P>> operator++(int) const
       {
-        if (pattern->custom_rep())
-          return {pattern};
-
-        return {std::make_shared<Rep>(pattern)};
+        return {std::make_shared<Rep<P>>(pattern)};
       }
 
-      Pattern operator!() const
+      Pattern<Not<P>> operator!() const
       {
-        return {std::make_shared<Not>(pattern)};
+        return {std::make_shared<Not<P>>(pattern)};
       }
 
-      Pattern operator*(Pattern rhs) const
+      template <typename P2>
+      Pattern<Seq<P, P2>> operator*(Pattern<P2> rhs) const
       {
-        return {std::make_shared<Seq>(pattern, rhs.pattern)};
+        return {std::make_shared<Seq<P,P2>>(pattern, rhs.pattern)};
       }
 
-      Pattern operator/(Pattern rhs) const
+      template <typename P2>
+      Pattern<Choice<P,P2>> operator/(Pattern<P2> rhs) const
       {
-        return {std::make_shared<Choice>(pattern, rhs.pattern)};
+        return {std::make_shared<Choice<P,P2>>(pattern, rhs.pattern)};
       }
 
-      Pattern operator<<(Pattern rhs) const
+      template <typename P2>
+      Pattern<Children<P,P2>> operator<<(Pattern<P2> rhs) const
       {
-        return {std::make_shared<Children>(pattern, rhs.pattern)};
+        return {std::make_shared<Children<P, P2>>(pattern, rhs.pattern)};
       }
     };
 
@@ -598,38 +621,39 @@ namespace trieste
     };
   }
 
-  template<typename F>
-  inline auto operator>>(detail::Pattern pattern, F effect)
+  // TODO here we could lift the change further
+  template<typename F, typename P>
+  inline auto operator>>(detail::Pattern<P> pattern, F effect)
     -> detail::PatternEffect<decltype(effect(std::declval<Match&>()))>
   {
-    return {pattern, effect};
+    return {(detail::PatternPtr)pattern, effect};
   }
 
-  inline const auto Any = detail::Pattern(std::make_shared<detail::Anything>());
-  inline const auto Start = detail::Pattern(std::make_shared<detail::First>());
-  inline const auto End = detail::Pattern(std::make_shared<detail::Last>());
+  inline const auto Any = detail::Pattern<detail::Anything>(std::make_shared<detail::Anything>());
+  inline const auto Start = detail::Pattern<detail::First>(std::make_shared<detail::First>());
+  inline const auto End = detail::Pattern<detail::Last>(std::make_shared<detail::Last>());
 
-  inline detail::Pattern T(const Token& type)
+  inline detail::Pattern<detail::TokenMatch> T(const Token& type)
   {
-    return detail::Pattern(std::make_shared<detail::TokenMatch>(type));
+    return {std::make_shared<detail::TokenMatch>(type)};
   }
 
-  inline detail::Pattern T(const Token& type, const std::string& r)
+  inline detail::Pattern<detail::RegexMatch> T(const Token& type, const std::string& r)
   {
-    return detail::Pattern(std::make_shared<detail::RegexMatch>(type, r));
+    return {std::make_shared<detail::RegexMatch>(type, r)};
   }
 
-  inline detail::Pattern In(const Token& type)
+  inline detail::Pattern<detail::Inside> In(const Token& type)
   {
-    return detail::Pattern(std::make_shared<detail::Inside>(type));
+    return {std::make_shared<detail::Inside>(type)};
   }
 
   template<typename... Ts>
-  inline detail::Pattern
+  inline detail::Pattern<detail::InsideN>
   In(const Token& type1, const Token& type2, const Ts&... types)
   {
     std::vector<Token> t = {type1, type2, types...};
-    return detail::Pattern(std::make_shared<detail::InsideN>(t));
+    return {std::make_shared<detail::InsideN>(t)};
   }
 
   inline detail::EphemeralNode operator-(Node node)

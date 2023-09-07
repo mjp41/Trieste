@@ -147,7 +147,7 @@ namespace trieste
           auto match = Match(node);
           auto start = it;
 
-          if (rule.first.match(it, node->end(), match))
+          if (rule.first->match(it, node->end(), match))
           {
             // Replace [start, it) with whatever the rule builds.
             auto replace = rule.second(match);
