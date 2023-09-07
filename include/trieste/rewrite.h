@@ -557,17 +557,17 @@ namespace trieste
 
       Pattern<Opt<P>> operator~() const
       {
-        return {std::make_shared<Opt>(pattern)};
+        return {std::make_shared<Opt<P>>(pattern)};
       }
 
       Pattern<Pred<P>> operator++() const
       {
-        return {std::make_shared<Pred>(pattern)};
+        return {std::make_shared<Pred<P>>(pattern)};
       }
 
       Pattern<NegPred<P>> operator--() const
       {
-        return {std::make_shared<NegPred>(pattern)};
+        return {std::make_shared<NegPred<P>>(pattern)};
       }
 
       Pattern<Rep<P>> operator++(int) const
