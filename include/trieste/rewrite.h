@@ -80,7 +80,7 @@ namespace trieste
       Cap(const Token& name, P pattern) : name(name), pattern(pattern)
       {}
 
-      SNMALLOC_FAST_PATH bool match(NodeIt& it, NodeIt end, Match& match) const override
+      bool match(NodeIt& it, NodeIt end, Match& match) const override
       {
         auto begin = it;
         auto match2 = match;
@@ -99,7 +99,7 @@ namespace trieste
     public:
       Anything() {}
 
-      SNMALLOC_FAST_PATH bool match(NodeIt& it, NodeIt end, Match&) const override
+      bool match(NodeIt& it, NodeIt end, Match&) const override
       {
         if (it == end)
           return false;
@@ -117,7 +117,7 @@ namespace trieste
     public:
       TokenMatch(const Token& type) : type(type) {}
 
-      SNMALLOC_FAST_PATH bool match(NodeIt& it, NodeIt end, Match&) const override
+      bool match(NodeIt& it, NodeIt end, Match&) const override
       {
         if ((it == end) || ((*it)->type() != type))
           return false;
@@ -137,7 +137,7 @@ namespace trieste
       RegexMatch(const Token& type, const std::string& r) : type(type), regex(std::make_shared<RE2>(r))
       {}
 
-      SNMALLOC_FAST_PATH bool match(NodeIt& it, NodeIt end, Match&) const override
+      bool match(NodeIt& it, NodeIt end, Match&) const override
       {
         if ((it == end) || ((*it)->type() != type))
           return false;
@@ -159,7 +159,7 @@ namespace trieste
     public:
       Opt(P pattern) : pattern(pattern) {}
 
-      SNMALLOC_FAST_PATH bool match(NodeIt& it, NodeIt end, Match& match) const override
+      bool match(NodeIt& it, NodeIt end, Match& match) const override
       {
         auto match2 = match;
 
@@ -188,7 +188,7 @@ namespace trieste
         return true;
       }
 
-      SNMALLOC_FAST_PATH bool match(NodeIt& it, NodeIt end, Match& match) const override
+      bool match(NodeIt& it, NodeIt end, Match& match) const override
       {
         if (pattern.custom_rep())
           return pattern.match(it, end, match);
@@ -208,7 +208,7 @@ namespace trieste
     public:
       Not(P pattern) : pattern(pattern) {}
 
-      SNMALLOC_FAST_PATH bool match(NodeIt& it, NodeIt end, Match& match) const override
+      bool match(NodeIt& it, NodeIt end, Match& match) const override
       {
         if (it == end)
           return false;
@@ -237,7 +237,7 @@ namespace trieste
     public:
       Seq(P1 first, P2 second) : first(first), second(second) {}
 
-      SNMALLOC_FAST_PATH bool match(NodeIt& it, NodeIt end, Match& match) const override
+      bool match(NodeIt& it, NodeIt end, Match& match) const override
       {
         auto match2 = match;
         auto begin = it;
@@ -267,7 +267,7 @@ namespace trieste
       Choice(P1 first, P2 second) : first(first), second(second)
       {}
 
-      SNMALLOC_FAST_PATH bool match(NodeIt& it, NodeIt end, Match& match) const override
+      bool match(NodeIt& it, NodeIt end, Match& match) const override
       {
         auto match2 = match;
 
@@ -310,7 +310,7 @@ namespace trieste
         return true;
       }
 
-      SNMALLOC_FAST_PATH bool match(NodeIt& it, NodeIt end, Match&) const override
+      bool match(NodeIt& it, NodeIt end, Match&) const override
       {
         if (it == end)
           return false;
@@ -353,7 +353,7 @@ namespace trieste
         return true;
       }
 
-      SNMALLOC_FAST_PATH bool match(NodeIt& it, NodeIt end, Match&) const override
+      bool match(NodeIt& it, NodeIt end, Match&) const override
       {
         if (it == end)
           return false;
@@ -386,7 +386,7 @@ namespace trieste
         return true;
       }
 
-      SNMALLOC_FAST_PATH bool match(NodeIt& it, NodeIt end, Match&) const override
+      bool match(NodeIt& it, NodeIt end, Match&) const override
       {
         if (it == end)
           return false;
@@ -407,7 +407,7 @@ namespace trieste
         return true;
       }
 
-      SNMALLOC_FAST_PATH bool match(NodeIt& it, NodeIt end, Match&) const override
+      bool match(NodeIt& it, NodeIt end, Match&) const override
       {
         return it == end;
       }
@@ -425,7 +425,7 @@ namespace trieste
       : pattern(pattern), children(children)
       {}
 
-      SNMALLOC_FAST_PATH bool match(NodeIt& it, NodeIt end, Match& match) const override
+      bool match(NodeIt& it, NodeIt end, Match& match) const override
       {
         auto match2 = match;
         auto begin = it;
@@ -462,7 +462,7 @@ namespace trieste
         return true;
       }
 
-      SNMALLOC_FAST_PATH bool match(NodeIt& it, NodeIt end, Match& match) const override
+      bool match(NodeIt& it, NodeIt end, Match& match) const override
       {
         auto begin = it;
         auto match2 = match;
@@ -487,7 +487,7 @@ namespace trieste
         return true;
       }
 
-      SNMALLOC_FAST_PATH bool match(NodeIt& it, NodeIt end, Match& match) const override
+      bool match(NodeIt& it, NodeIt end, Match& match) const override
       {
         auto begin = it;
         auto match2 = match;
@@ -512,7 +512,7 @@ namespace trieste
       : action(action), pattern(pattern)
       {}
 
-      SNMALLOC_FAST_PATH bool match(NodeIt& it, NodeIt end, Match& match) const override
+      bool match(NodeIt& it, NodeIt end, Match& match) const override
       {
         auto begin = it;
         auto match2 = match;
@@ -557,7 +557,7 @@ namespace trieste
         return std::make_shared<P>(pattern);
       }
 
-      SNMALLOC_FAST_PATH bool match(NodeIt& it, NodeIt end, Match& match) const
+      bool match(NodeIt& it, NodeIt end, Match& match) const
       {
         return pattern.match(it, end, match);
       }
