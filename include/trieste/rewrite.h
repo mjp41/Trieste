@@ -154,7 +154,7 @@ namespace trieste
       std::shared_ptr<P> pattern;
 
     public:
-      Opt(P pattern) : pattern(pattern) {}
+      Opt(std::shared_ptr<P> pattern) : pattern(pattern) {}
 
       bool match(NodeIt& it, NodeIt end, Match& match) const override
       {
