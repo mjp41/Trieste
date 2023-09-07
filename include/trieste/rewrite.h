@@ -55,7 +55,11 @@ namespace trieste
     public:
       virtual ~PatternDef() = default;
 
-      virtual bool custom_rep()
+      // Used to change the behaviour of a pattern inside a Rep.
+      virtual void set_in_rep()
+      {}
+
+      virtual bool custom_rep() const
       {
         return false;
       }
@@ -73,10 +77,10 @@ namespace trieste
     {
     private:
       Token name;
-      std::shared_ptr<P> pattern;
+      P pattern;
 
     public:
-      Cap(const Token& name, std::shared_ptr<P> pattern) : name(name), pattern(pattern)
+      Cap(const Token& name, P pattern) : name(name), pattern(pattern)
       {}
 
       SNMALLOC_FAST_PATH bool match(NodeIt& it, NodeIt end, Match& match) const override
@@ -84,7 +88,7 @@ namespace trieste
         auto begin = it;
         auto match2 = match;
 
-        if (!pattern->match(it, end, match2))
+        if (!pattern.match(it, end, match2))
           return false;
 
         match += match2;
@@ -130,10 +134,10 @@ namespace trieste
     {
     private:
       Token type;
-      RE2 regex;
+      std::shared_ptr<RE2> regex;
 
     public:
-      RegexMatch(const Token& type, const std::string& r) : type(type), regex(r)
+      RegexMatch(const Token& type, const std::string& r) : type(type), regex(std::make_shared<RE2>(r))
       {}
 
       SNMALLOC_FAST_PATH bool match(NodeIt& it, NodeIt end, Match&) const override
@@ -141,7 +145,7 @@ namespace trieste
         if ((it == end) || ((*it)->type() != type))
           return false;
 
-        if (!RE2::FullMatch((*it)->location().view(), regex))
+        if (!RE2::FullMatch((*it)->location().view(), *regex))
           return false;
 
         ++it;
@@ -153,16 +157,16 @@ namespace trieste
     class Opt : public PatternDef
     {
     private:
-      std::shared_ptr<P> pattern;
+      P pattern;
 
     public:
-      Opt(std::shared_ptr<P> pattern) : pattern(pattern) {}
+      Opt(P pattern) : pattern(pattern) {}
 
       SNMALLOC_FAST_PATH bool match(NodeIt& it, NodeIt end, Match& match) const override
       {
         auto match2 = match;
 
-        if (pattern->match(it, end, match2))
+        if (pattern.match(it, end, match2))
           match += match2;
 
         return true;
@@ -173,12 +177,12 @@ namespace trieste
     class Rep : public PatternDef
     {
     private:
-      std::shared_ptr<P> pattern;
+      P pattern;
 
     public:
-      Rep(std::shared_ptr<P> pattern) : pattern(pattern) {}
+      Rep(P pattern) : pattern(pattern) {}
 
-      bool custom_rep() override
+      bool custom_rep() const override
       {
         // Rep(Rep(...)) is treated as Rep(...).
         return true;
@@ -186,10 +190,10 @@ namespace trieste
 
       SNMALLOC_FAST_PATH bool match(NodeIt& it, NodeIt end, Match& match) const override
       {
-        if (pattern->custom_rep())
-          return pattern->match(it, end, match);
+        if (pattern.custom_rep())
+          return pattern.match(it, end, match);
 
-        while ((it != end) && pattern->match(it, end, match))
+        while ((it != end) && pattern.match(it, end, match))
           ;
         return true;
       }
@@ -199,10 +203,10 @@ namespace trieste
     class Not : public PatternDef
     {
     private:
-      std::shared_ptr<P> pattern;
+      P pattern;
 
     public:
-      Not(std::shared_ptr<P> pattern) : pattern(pattern) {}
+      Not(P pattern) : pattern(pattern) {}
 
       SNMALLOC_FAST_PATH bool match(NodeIt& it, NodeIt end, Match& match) const override
       {
@@ -212,7 +216,7 @@ namespace trieste
         auto match2 = match;
         auto begin = it;
 
-        if (pattern->match(it, end, match2))
+        if (pattern.match(it, end, match2))
         {
           it = begin;
           return false;
@@ -227,21 +231,21 @@ namespace trieste
     class Seq : public PatternDef
     {
     private:
-      std::shared_ptr<P1> first;
-      std::shared_ptr<P2> second;
+      P1 first;
+      P2 second;
 
     public:
-      Seq(std::shared_ptr<P1> first, std::shared_ptr<P2> second) : first(first), second(second) {}
+      Seq(P1 first, P2 second) : first(first), second(second) {}
 
       SNMALLOC_FAST_PATH bool match(NodeIt& it, NodeIt end, Match& match) const override
       {
         auto match2 = match;
         auto begin = it;
 
-        if (!first->match(it, end, match2))
+        if (!first.match(it, end, match2))
           return false;
 
-        if (!second->match(it, end, match2))
+        if (!second.match(it, end, match2))
         {
           it = begin;
           return false;
@@ -256,18 +260,18 @@ namespace trieste
     class Choice : public PatternDef
     {
     private:
-      std::shared_ptr<P1> first;
-      std::shared_ptr<P2> second;
+      P1 first;
+      P2 second;
 
     public:
-      Choice(std::shared_ptr<P1> first, std::shared_ptr<P2> second) : first(first), second(second)
+      Choice(P1 first, P2 second) : first(first), second(second)
       {}
 
       SNMALLOC_FAST_PATH bool match(NodeIt& it, NodeIt end, Match& match) const override
       {
         auto match2 = match;
 
-        if (first->match(it, end, match2))
+        if (first.match(it, end, match2))
         {
           match += match2;
           return true;
@@ -275,7 +279,7 @@ namespace trieste
 
         auto match3 = match;
 
-        if (second->match(it, end, match3))
+        if (second.match(it, end, match3))
         {
           match += match3;
           return true;
@@ -294,10 +298,15 @@ namespace trieste
     public:
       Inside(const Token& type) : type(type), any(false) {}
 
-      bool custom_rep() override
+      void set_in_rep() override
       {
         // Rep(Inside) checks for any parent, not just the immediate parent.
         any = true;
+      }
+
+      bool custom_rep() const override
+      {
+        // Rep(Inside) checks for any parent, not just the immediate parent.
         return true;
       }
 
@@ -332,10 +341,15 @@ namespace trieste
     public:
       InsideN(const std::vector<Token>& types) : types(types), any(false) {}
 
-      bool custom_rep() override
+      void set_in_rep() override
       {
         // Rep(InsideN) checks for any parent, not just the immediate parent.
         any = true;
+      }
+
+      bool custom_rep() const override
+      {
+        // Rep(InsideN) checks for any parent, not just the immediate parent.
         return true;
       }
 
@@ -366,7 +380,7 @@ namespace trieste
     public:
       First() {}
 
-      bool custom_rep() override
+      bool custom_rep() const override
       {
         // Rep(First) is treated as First.
         return true;
@@ -387,7 +401,7 @@ namespace trieste
     public:
       Last() {}
 
-      bool custom_rep() override
+      bool custom_rep() const override
       {
         // Rep(Last) is treated as Last.
         return true;
@@ -403,11 +417,11 @@ namespace trieste
     class Children : public PatternDef
     {
     private:
-      std::shared_ptr<P> pattern;
-      std::shared_ptr<C> children;
+      P pattern;
+      C children;
 
     public:
-      Children(std::shared_ptr<P> pattern, std::shared_ptr<C> children)
+      Children(P pattern, C children)
       : pattern(pattern), children(children)
       {}
 
@@ -416,13 +430,13 @@ namespace trieste
         auto match2 = match;
         auto begin = it;
 
-        if (!pattern->match(it, end, match2))
+        if (!pattern.match(it, end, match2))
           return false;
 
         auto it2 = (*begin)->begin();
         auto end2 = (*begin)->end();
 
-        if (!children->match(it2, end2, match2))
+        if (!children.match(it2, end2, match2))
         {
           it = begin;
           return false;
@@ -437,12 +451,12 @@ namespace trieste
     class Pred : public PatternDef
     {
     private:
-      std::shared_ptr<P> pattern;
+      P pattern;
 
     public:
-      Pred(std::shared_ptr<P> pattern) : pattern(pattern) {}
+      Pred(P pattern) : pattern(pattern) {}
 
-      bool custom_rep() override
+      bool custom_rep() const override
       {
         // Rep(Pred(...)) is treated as Pred(...).
         return true;
@@ -452,7 +466,7 @@ namespace trieste
       {
         auto begin = it;
         auto match2 = match;
-        bool ok = pattern->match(it, end, match2);
+        bool ok = pattern.match(it, end, match2);
         it = begin;
         return ok;
       }
@@ -462,12 +476,12 @@ namespace trieste
     class NegPred : public PatternDef
     {
     private:
-      std::shared_ptr<P> pattern;
+      P pattern;
 
     public:
-      NegPred(std::shared_ptr<P> pattern) : pattern(pattern) {}
+      NegPred(P pattern) : pattern(pattern) {}
 
-      bool custom_rep() override
+      bool custom_rep() const override
       {
         // Rep(NegPred(...)) is treated as NegPred(...).
         return true;
@@ -477,7 +491,7 @@ namespace trieste
       {
         auto begin = it;
         auto match2 = match;
-        bool ok = pattern->match(it, end, match2);
+        bool ok = pattern.match(it, end, match2);
         it = begin;
         return !ok;
       }
@@ -491,10 +505,10 @@ namespace trieste
     {
     private:
       ActionFn action;
-      std::shared_ptr<P> pattern;
+      P pattern;
 
     public:
-      Action(ActionFn action, std::shared_ptr<P> pattern)
+      Action(ActionFn action, P pattern)
       : action(action), pattern(pattern)
       {}
 
@@ -503,7 +517,7 @@ namespace trieste
         auto begin = it;
         auto match2 = match;
 
-        if (!pattern->match(it, end, match2))
+        if (!pattern.match(it, end, match2))
           return false;
 
         if (!action({begin, it}))
@@ -532,72 +546,72 @@ namespace trieste
       template <typename P1>
       friend class Pattern;
     private:
-      std::shared_ptr<P> pattern;
+      P pattern;
 
     public:
-      Pattern(std::shared_ptr<P> pattern) : pattern(pattern) {}
+      Pattern(P pattern) : pattern(std::move(pattern)) {}
 
       operator PatternPtr() const
       {
-        return pattern;
+        return std::make_shared<PatternDef>(pattern);
       }
 
       SNMALLOC_FAST_PATH bool match(NodeIt& it, NodeIt end, Match& match) const
       {
-        return pattern->match(it, end, match);
+        return pattern.match(it, end, match);
       }
 
       Pattern<Action<P>> operator()(ActionFn action) const
       {
-        return {std::make_shared<Action<P>>(action, pattern)};
+        return {{action, pattern}};
       }
 
       Pattern<Cap<P>> operator[](const Token& name) const
       {
-        return {std::make_shared<Cap<P>>(name, pattern)};
+        return {{name, pattern}};
       }
 
       Pattern<Opt<P>> operator~() const
       {
-        return {std::make_shared<Opt<P>>(pattern)};
+        return {{pattern}};
       }
 
       Pattern<Pred<P>> operator++() const
       {
-        return {std::make_shared<Pred<P>>(pattern)};
+        return {{pattern}};
       }
 
       Pattern<NegPred<P>> operator--() const
       {
-        return {std::make_shared<NegPred<P>>(pattern)};
+        return {{pattern}};
       }
 
       Pattern<Rep<P>> operator++(int) const
       {
-        return {std::make_shared<Rep<P>>(pattern)};
+        return {{pattern}};
       }
 
       Pattern<Not<P>> operator!() const
       {
-        return {std::make_shared<Not<P>>(pattern)};
+        return {{pattern}};
       }
 
       template <typename P2>
       Pattern<Seq<P, P2>> operator*(Pattern<P2> rhs) const
       {
-        return {std::make_shared<Seq<P,P2>>(pattern, rhs.pattern)};
+        return {{pattern, rhs.pattern}};
       }
 
       template <typename P2>
       Pattern<Choice<P,P2>> operator/(Pattern<P2> rhs) const
       {
-        return {std::make_shared<Choice<P,P2>>(pattern, rhs.pattern)};
+        return {{pattern, rhs.pattern}};
       }
 
       template <typename P2>
       Pattern<Children<P,P2>> operator<<(Pattern<P2> rhs) const
       {
-        return {std::make_shared<Children<P, P2>>(pattern, rhs.pattern)};
+        return {{pattern, rhs.pattern}};
       }
     };
 
@@ -631,23 +645,23 @@ namespace trieste
     return {(detail::PatternPtr)pattern, effect};
   }
 
-  inline const auto Any = detail::Pattern<detail::Anything>(std::make_shared<detail::Anything>());
-  inline const auto Start = detail::Pattern<detail::First>(std::make_shared<detail::First>());
-  inline const auto End = detail::Pattern<detail::Last>(std::make_shared<detail::Last>());
+  inline const auto Any = detail::Pattern<detail::Anything>(detail::Anything());
+  inline const auto Start = detail::Pattern<detail::First>(detail::First());
+  inline const auto End = detail::Pattern<detail::Last>(detail::Last());
 
   inline detail::Pattern<detail::TokenMatch> T(const Token& type)
   {
-    return {std::make_shared<detail::TokenMatch>(type)};
+    return {type};
   }
 
   inline detail::Pattern<detail::RegexMatch> T(const Token& type, const std::string& r)
   {
-    return {std::make_shared<detail::RegexMatch>(type, r)};
+    return {detail::RegexMatch(type, r)};
   }
 
   inline detail::Pattern<detail::Inside> In(const Token& type)
   {
-    return {std::make_shared<detail::Inside>(type)};
+    return {type};
   }
 
   template<typename... Ts>
@@ -655,7 +669,7 @@ namespace trieste
   In(const Token& type1, const Token& type2, const Ts&... types)
   {
     std::vector<Token> t = {type1, type2, types...};
-    return {std::make_shared<detail::InsideN>(t)};
+    return {t};
   }
 
   inline detail::EphemeralNode operator-(Node node)
