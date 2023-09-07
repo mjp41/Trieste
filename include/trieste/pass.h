@@ -23,7 +23,12 @@ namespace trieste
   private:
     F pre_once;
     F post_once;
+    
+    // Flag specifies if pre_ is empty.
+    bool pre_set_ = false;
     std::map<Token, F> pre_;
+
+    bool post_set_ = false;
     std::map<Token, F> post_;
     dir::flag direction_;
     std::vector<detail::PatternEffect<Node>> rules_;
@@ -58,11 +63,13 @@ namespace trieste
 
     void pre(const Token& type, F f)
     {
+      pre_set_ = true;
       pre_[type] = f;
     }
 
     void post(const Token& type, F f)
     {
+      post_set_ = true;
       post_[type] = f;
     }
 
@@ -122,9 +129,12 @@ namespace trieste
 
       size_t changes = 0;
 
-      auto pre_f = pre_.find(node->type());
-      if (pre_f != pre_.end())
-        changes += pre_f->second(node);
+      if (SNMALLOC_UNLIKELY(pre_set_))
+      {
+        auto pre_f = pre_.find(node->type());
+        if (pre_f != pre_.end())
+          changes += pre_f->second(node);
+      }
 
       auto it = node->begin();
 
@@ -226,9 +236,12 @@ namespace trieste
         }
       }
 
-      auto post_f = post_.find(node->type());
-      if (post_f != post_.end())
-        changes += post_f->second(node);
+      if (SNMALLOC_UNLIKELY(post_set_))
+      {
+        auto post_f = post_.find(node->type());
+        if (post_f != post_.end())
+          changes += post_f->second(node);
+      }
 
       return changes;
     }
