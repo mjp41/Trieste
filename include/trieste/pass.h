@@ -138,6 +138,7 @@ namespace trieste
 
       auto it = node->begin();
 
+      auto match = Match(node);
       while (it != node->end())
       {
         // Don't examine Error or Lift nodes.
@@ -154,9 +155,8 @@ namespace trieste
 
         for (auto& rule : rules_)
         {
-          auto match = Match(node);
           auto start = it;
-
+          match.reset();
           if (rule.first->match(it, node->end(), match))
           {
             // Replace [start, it) with whatever the rule builds.
