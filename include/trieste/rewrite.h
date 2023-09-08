@@ -548,7 +548,7 @@ namespace trieste
     public:
       virtual ~RewriteDef() = default;
 
-      virtual bool apply(Match& match, Node node, NodeIt start, NodeIt& it, size_t& changes, ptrdiff_t& replaced) const = 0;
+      virtual bool apply(Match& match, const Node& node, const NodeIt& start, NodeIt& it, size_t& changes, ptrdiff_t& replaced) const = 0;
     };
 
     template <typename R1, typename R2>
@@ -561,7 +561,7 @@ namespace trieste
     public:
       RewriteOr(R1 left, R2 right) : left(left), right(right) {}
 
-      bool apply(Match& match, Node node, NodeIt start, NodeIt& it, size_t& changes, ptrdiff_t& replaced) const override
+      bool apply(Match& match, const Node& node, const NodeIt& start, NodeIt& it, size_t& changes, ptrdiff_t& replaced) const override
       {
         Match match2 = match;
         NodeIt curr = it;
@@ -586,7 +586,7 @@ namespace trieste
     public:
       RewriteSeq(P left, R right) : left(left), right(right) {}
 
-      bool apply(Match& match, Node node, NodeIt start, NodeIt& it, size_t& changes, ptrdiff_t& replaced) const override
+      bool apply(Match& match, const Node& node, const NodeIt& start, NodeIt& it, size_t& changes, ptrdiff_t& replaced) const override
       {
         if (!left.match(it, node->end(), match))
           return false;
@@ -604,7 +604,7 @@ namespace trieste
     public:
       RewriteAction(F&& effect) : effect(std::forward<F>(effect)) {}
 
-      bool apply(Match& match, Node node, NodeIt start, NodeIt& it, size_t& changes, ptrdiff_t& replaced) const
+      bool apply(Match& match, const Node& node, const NodeIt& start, NodeIt& it, size_t& changes, ptrdiff_t& replaced) const
       {
         // Apply the replacement
         // Replace [start, it) with whatever the rule builds.
