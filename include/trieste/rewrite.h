@@ -547,14 +547,140 @@ namespace trieste
       }
     };
 
-    template <typename P>
-    class Pattern;
 
-    template<typename T>
-    using Effect = std::function<T(Match&)>;
+    class RewriteDef
+    {
+    public:
+      virtual ~RewriteDef() = default;
 
-    template<typename T>
-    using PatternEffect = std::pair<PatternPtr, Effect<T>>;
+      virtual bool apply(Match& match, Node node, NodeIt start, NodeIt& it, size_t& changes, ptrdiff_t& replaced) const = 0;
+    };
+
+    template <typename R1, typename R2>
+    class RewriteOr : public RewriteDef
+    {
+    private:
+      R1 left;
+      R2 right;
+
+    public:
+      RewriteOr(R1 left, R2 right) : left(left), right(right) {}
+
+      bool apply(Match& match, Node node, NodeIt start, NodeIt& it, size_t& changes, ptrdiff_t& replaced) const override
+      {
+        Match match2 = match;
+        NodeIt curr = it;
+
+        if (left.apply(match, node, start, it, changes, replaced))
+          return true;
+
+        match = match2;
+        it = curr;
+
+        return right.apply(match, node, start, it, changes, replaced);
+      }
+    };
+
+    template <typename P, typename R>
+    class RewriteSeq : public RewriteDef
+    {
+    private:
+      P left;
+      R right;
+
+    public:
+      RewriteSeq(P left, R right) : left(left), right(right) {}
+
+      bool apply(Match& match, Node node, NodeIt start, NodeIt& it, size_t& changes, ptrdiff_t& replaced) const override
+      {
+        if (!left.match(it, node->end(), match))
+          return false;
+
+        return right.apply(match, node, start, it, changes, replaced);
+      }
+    };
+
+    template <typename F>
+    class RewriteAction : public RewriteDef
+    {
+    private:
+      F effect;
+
+    public:
+      RewriteAction(F&& effect) : effect(std::forward<F>(effect)) {}
+
+      bool apply(Match& match, Node node, NodeIt start, NodeIt& it, size_t& changes, ptrdiff_t& replaced) const
+      {
+        // Apply the replacement
+        // Replace [start, it) with whatever the rule builds.
+        auto replace = effect(match);
+
+        if (replace && (replace->type() == NoChange))
+          return false; // TODO: Is NoChange like try more options?
+
+        auto loc = (*start)->location();
+
+        for (auto i = start + 1; i < it; ++i)
+          loc = loc * (*i)->location();
+
+        it = node->erase(start, it);
+
+        // If we return nothing, just remove the matched nodes.
+        if (!replace)
+        {
+          replaced = 0;
+        }
+        else if (replace->type() == trieste::Seq)
+        {
+          // Unpack the sequence.
+          std::for_each(replace->begin(), replace->end(), [&](Node n) {
+            n->set_location(loc);
+          });
+
+          replaced = replace->size();
+          it = node->insert(it, replace->begin(), replace->end());
+        }
+        else
+        {
+          // Replace with a single node.
+          replaced = 1;
+          replace->set_location(loc);
+          it = node->insert(it, replace);
+        }
+
+        changes += replaced;
+
+        return true;
+      }
+    };
+
+    using RewritePtr = std::shared_ptr<detail::RewriteDef>;
+
+    template <typename R>
+    class RewriteWrapper
+    {
+      template <typename P1>
+      friend class Pattern;
+
+      template <typename R1>
+      friend class RewriteWrapper;
+    private:
+      R rule;
+
+    public:
+      RewriteWrapper(R rule) : rule(rule) {}
+
+      template <typename R2>
+      RewriteWrapper<RewriteOr<R,R2>> operator /(RewriteWrapper<R2> rhs) const
+      {
+        return {{rule, rhs.rule}};
+      }
+
+      operator RewritePtr()
+      {
+        return std::make_shared<R>(rule);
+      }
+    };
 
     template <typename P>
     class Pattern
@@ -631,6 +757,21 @@ namespace trieste
       {
         return {{pattern, rhs.pattern}};
       }
+
+      template<typename F>
+      inline auto operator>>(F&& effect)
+        -> detail::RewriteWrapper<detail::RewriteSeq<P, detail::RewriteAction<F>>>
+      {
+        return {{pattern, {std::forward<F>(effect)}}};
+      }
+
+      // TODO here we could lift the change further
+      template<typename R>
+      inline auto operator>>(detail::RewriteWrapper<R> r)
+        -> detail::RewriteWrapper<detail::RewriteSeq<P, R>>
+      {
+        return {{pattern, r.rule}};
+      }
     };
 
     struct RangeContents
@@ -653,15 +794,7 @@ namespace trieste
     {
       NodeRange range;
     };
-  }
-
-  // TODO here we could lift the change further
-  template<typename F, typename P>
-  inline auto operator>>(detail::Pattern<P> pattern, F effect)
-    -> detail::PatternEffect<decltype(effect(std::declval<Match&>()))>
-  {
-    return {(detail::PatternPtr)pattern, effect};
-  }
+  } 
 
   inline const auto Any = detail::Pattern<detail::Anything>(detail::Anything());
   inline const auto Start = detail::Pattern<detail::First>(detail::First());

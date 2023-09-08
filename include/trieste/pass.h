@@ -31,18 +31,18 @@ namespace trieste
     bool post_set_ = false;
     std::map<Token, F> post_;
     dir::flag direction_;
-    std::vector<detail::PatternEffect<Node>> rules_;
+    std::vector<detail::RewritePtr> rules_;
 
   public:
     PassDef(dir::flag direction = dir::topdown) : direction_(direction) {}
 
-    PassDef(const std::initializer_list<detail::PatternEffect<Node>>& r)
+    PassDef(const std::initializer_list<detail::RewritePtr>& r)
     : direction_(dir::topdown), rules_(r)
     {}
 
     PassDef(
       dir::flag direction,
-      const std::initializer_list<detail::PatternEffect<Node>>& r)
+      const std::initializer_list<detail::RewritePtr>& r)
     : direction_(direction), rules_(r)
     {}
 
@@ -76,11 +76,11 @@ namespace trieste
     template<typename... Ts>
     void rules(Ts... r)
     {
-      std::vector<detail::PatternEffect<Node>> rules = {r...};
+      std::vector<detail::RewritePtr> rules = {r...};
       rules_.insert(rules_.end(), rules.begin(), rules.end());
     }
 
-    void rules(const std::initializer_list<detail::PatternEffect<Node>>& r)
+    void rules(const std::initializer_list<detail::RewritePtr>& r)
     {
       rules_.insert(rules_.end(), r.begin(), r.end());
     }
@@ -125,55 +125,13 @@ namespace trieste
 
     void step(Match& match, Node node, NodeIt& it, size_t& changes, ptrdiff_t& replaced)
     {
-
         for (auto& rule : rules_)
         {
           auto start = it;
           match.reset();
-          if (rule.first->match(it, node->end(), match))
-          {
-            // Replace [start, it) with whatever the rule builds.
-            auto replace = rule.second(match);
-
-            if (replace && (replace->type() == NoChange))
-            {
-              it = start;
-              continue;
-            }
-
-            auto loc = (*start)->location();
-
-            for (auto i = start + 1; i < it; ++i)
-              loc = loc * (*i)->location();
-
-            it = node->erase(start, it);
-
-            // If we return nothing, just remove the matched nodes.
-            if (!replace)
-            {
-              replaced = 0;
-            }
-            else if (replace->type() == Seq)
-            {
-              // Unpack the sequence.
-              std::for_each(replace->begin(), replace->end(), [&](Node n) {
-                n->set_location(loc);
-              });
-
-              replaced = replace->size();
-              it = node->insert(it, replace->begin(), replace->end());
-            }
-            else
-            {
-              // Replace with a single node.
-              replaced = 1;
-              replace->set_location(loc);
-              it = node->insert(it, replace);
-            }
-
-            changes += replaced;
-            break;
-          }
+          if (rule->apply(match, node, start, it, changes, replaced))
+            return;
+          it = start;
         }
     }
 
