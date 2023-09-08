@@ -17,16 +17,16 @@ namespace trieste
   class Match
   {
   private:
-    Node in_node;
+    Node top_node;
     bool captures_set = false;
     std::map<Token, NodeRange> captures;
 
   public:
-    Match(Node in_node) : in_node(in_node) {}
+    Match(Node top_node) : top_node(top_node) {}
 
     Location fresh(const Location& prefix = {})
     {
-      return in_node->fresh(prefix);
+      return top_node->fresh(prefix);
     }
 
     NodeRange& operator[](const Token& token)

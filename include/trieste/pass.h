@@ -95,9 +95,10 @@ namespace trieste
         changes_sum += pre_once(node);
 
       // Because apply runs over child nodes, the top node is never visited.
+      Match match(node);
       do
       {
-        changes = apply(node);
+        changes = apply(match, node);
 
         auto lifted = lift(node);
         if (!lifted.empty())
@@ -122,36 +123,8 @@ namespace trieste
       return (direction_ & f) != 0;
     }
 
-    size_t apply(Node node)
+    void step(Match& match, Node node, NodeIt& it, size_t& changes, ptrdiff_t& replaced)
     {
-      if (node->type().in({Error, Lift}))
-        return 0;
-
-      size_t changes = 0;
-
-      if (SNMALLOC_UNLIKELY(pre_set_))
-      {
-        auto pre_f = pre_.find(node->type());
-        if (pre_f != pre_.end())
-          changes += pre_f->second(node);
-      }
-
-      auto it = node->begin();
-
-      auto match = Match(node);
-      while (it != node->end())
-      {
-        // Don't examine Error or Lift nodes.
-        if ((*it)->type().in({Error, Lift}))
-        {
-          ++it;
-          continue;
-        }
-
-        if (flag(dir::bottomup))
-          changes += apply(*it);
-
-        ptrdiff_t replaced = -1;
 
         for (auto& rule : rules_)
         {
@@ -202,6 +175,39 @@ namespace trieste
             break;
           }
         }
+    }
+
+    size_t apply(Match& match, Node node)
+    {
+      if (node->type().in({Error, Lift}))
+        return 0;
+
+      size_t changes = 0;
+
+      if (SNMALLOC_UNLIKELY(pre_set_))
+      {
+        auto pre_f = pre_.find(node->type());
+        if (pre_f != pre_.end())
+          changes += pre_f->second(node);
+      }
+
+      auto it = node->begin();
+
+      while (it != node->end())
+      {
+        // Don't examine Error or Lift nodes.
+        if ((*it)->type().in({Error, Lift}))
+        {
+          ++it;
+          continue;
+        }
+
+        if (flag(dir::bottomup))
+          changes += apply(match, *it);
+
+        ptrdiff_t replaced = -1;
+
+        step(match, node, it, changes, replaced);
 
         if (flag(dir::once))
         {
@@ -211,7 +217,7 @@ namespace trieste
             auto to = std::max(replaced, ptrdiff_t(1));
 
             for (ptrdiff_t i = 0; i < to; ++i)
-              changes += apply(*(it + i));
+              changes += apply(match, *(it + i));
           }
 
           // Skip over everything we examined or populated.
@@ -229,7 +235,7 @@ namespace trieste
         {
           // If we did nothing, move down the tree.
           if (flag(dir::topdown))
-            changes += apply(*it);
+            changes += apply(match, *it);
 
           // Advance to the next node.
           ++it;
