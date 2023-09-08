@@ -508,22 +508,19 @@ namespace trieste
       }
     };
 
-    template<typename F>
-    concept ActionFn = requires(F f, const NodeRange& x) {
-        { f(x) } -> std::same_as<bool>;
-    };
+    using ActionFn = std::function<bool(const NodeRange&)>;
 
     // TODO carry lambda term type here too.
-    template <typename P, ActionFn F>
+    template <typename P>
     class Action : public PatternDef
     {
     private:
-      F action;
+      ActionFn action;
       P pattern;
 
     public:
-      Action(F&& action, P pattern)
-      : action(std::forward<F>(action)), pattern(pattern)
+      Action(ActionFn action, P pattern)
+      : action(action), pattern(pattern)
       {}
 
       bool match(NodeIt& it, NodeIt end, Match& match) const override
@@ -534,9 +531,7 @@ namespace trieste
         if (!pattern.match(it, end, match2))
           return false;
 
-        NodeRange range = {begin, it};
-
-        if (!action(range))
+        if (!action({begin, it}))
         {
           it = begin;
           return false;
@@ -704,10 +699,9 @@ namespace trieste
         return pattern.match(it, end, match);
       }
 
-      template <ActionFn F>
-      Pattern<Action<P, F>> operator()(F&& action) const
+      Pattern<Action<P>> operator()(ActionFn action) const
       {
-        return {{std::forward<F>(action), pattern}};
+        return {{action, pattern}};
       }
 
       Pattern<Cap<P>> operator[](const Token& name) const
