@@ -123,7 +123,7 @@ namespace trieste
       return (direction_ & f) != 0;
     }
 
-    void step(Match& match, Node node, NodeIt& it, size_t& changes, ptrdiff_t& replaced)
+    SNMALLOC_FAST_PATH void step(Match& match, Node node, NodeIt& it, size_t& changes, ptrdiff_t& replaced)
     {
         for (auto& rule : rules_)
         {
