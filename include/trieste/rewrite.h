@@ -664,17 +664,17 @@ namespace trieste
       }
     };
 
-    using ActionFn = std::function<bool(const NodeRange&)>;
 
+    template <typename F>
     class Action : public PatternDef
     {
     private:
-      ActionFn action;
+      F action;
       PatternPtr pattern;
 
     public:
-      Action(ActionFn action_, PatternPtr pattern_)
-      : action(action_), pattern(pattern_)
+      Action(F&& action_, PatternPtr pattern_)
+      : action(std::forward<F>(action_)), pattern(pattern_)
       {}
 
       PatternPtr clone() const& override
@@ -689,7 +689,9 @@ namespace trieste
         if (!pattern->match(it, end, match))
           return false;
 
-        return action({begin, it}) && match_continuation(it, end, match);
+        NodeRange range = {begin, it};
+        bool result = action(range);
+        return result && match_continuation(it, end, match);
       }
     };
 
@@ -714,9 +716,10 @@ namespace trieste
         return pattern->match(it, end, match);
       }
 
-      Pattern operator()(ActionFn action) const
+      template <typename F>
+      Pattern operator()(F&& action) const
       {
-        return {std::make_shared<Action>(action, pattern)};
+        return {std::make_shared<Action<F>>(std::forward<F>(action), pattern)};
       }
 
       Pattern operator[](const Token& name) const
