@@ -32,15 +32,6 @@ set(SNMALLOC_USE_CXX17 ${TRIESTE_USE_CXX17})
 set(RE2_BUILD_TESTING OFF CACHE INTERNAL "Turn off RE2 tests")
 
 FetchContent_Declare(
-  snmalloc
-  GIT_REPOSITORY https://github.com/microsoft/snmalloc
-  GIT_TAG main
-  GIT_SHALLOW TRUE
-)
-
-FetchContent_MakeAvailable(snmalloc)
-
-FetchContent_Declare(
   re2
   GIT_REPOSITORY https://github.com/google/re2
   GIT_TAG 2022-12-01
@@ -57,6 +48,15 @@ FetchContent_Declare(
 )
 
 FetchContent_MakeAvailable(cli11)
+
+FetchContent_Declare(
+  snmalloc
+  GIT_REPOSITORY https://github.com/microsoft/snmalloc
+  GIT_TAG main
+  GIT_SHALLOW TRUE
+)
+
+FetchContent_MakeAvailable(snmalloc)
 
 # #############################################
 # Create target and set properties

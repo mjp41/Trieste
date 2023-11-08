@@ -1044,7 +1044,17 @@ namespace trieste
       auto i = wf->index(node->type(), field);
 
       if (i != std::numeric_limits<size_t>::max())
-        return {wf, node->at(i), i};
+      {
+        auto n = node->at(i);
+        if (n->type() != field)
+          abort();
+        for (size_t j = 0; j < i; ++j)
+        {
+          if (node->at(j)->type() == field)
+            abort();
+        }
+        return {wf, n, i};
+      }
     }
 
     throw std::runtime_error(

@@ -60,7 +60,7 @@ namespace trieste
         ->check(logging::set_log_level_from_string);
 
       bool wfcheck = true;
-      build->add_flag("-w", wfcheck, "Check well-formedness.");
+      build->add_flag("-w,--wf-check", wfcheck, "Check well-formedness.");
 
       std::string limit = limits.back();
       build->add_option("-p,--pass", limit, "Run up to this pass.")

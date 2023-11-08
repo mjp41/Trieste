@@ -655,6 +655,19 @@ namespace trieste
       out << ")";
     }
 
+    template <size_t N>
+    auto destruct()
+    {
+      std::array<Node, N> result;
+      if (children.size() != N)
+        throw std::runtime_error("Invalid number of children");
+
+      for (size_t i = 0; i < N; ++i)
+        result[i] = children[i];
+
+      return std::tuple_cat(result);  
+    }
+
     /**
      * Returns the set of leaf Error nodes, Error nodes that do not contain Error nodes.
      * 
