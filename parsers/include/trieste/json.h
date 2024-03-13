@@ -20,49 +20,32 @@ namespace trieste
     inline const auto Member = TokenDef("json-member");
     inline const auto ErrorSeq = TokenDef("json-errorseq");
     inline const auto Comma = TokenDef("json-comma");
-    inline const auto Colon = TokenDef("json-colon");
-    inline const auto Lhs = TokenDef("json-lhs");
-    inline const auto Rhs = TokenDef("json-rhs");
-
-    // groups
-    inline const auto ArrayGroup = TokenDef("json-array-group");
-    inline const auto ObjectGroup = TokenDef("json-object-group");
 
     inline const auto wf_parse_tokens =
-      Object | Array | String | Number | True | False | Null | Comma | Colon;
+      Object | Array | String | Number | True | False | Null;
 
     // clang-format off
-  inline const auto wf_parse =
-    (Top <<= File)
-    | (File <<= Group++)
-    | (Value <<= Group)
-    | (Array <<= Group)
-    | (Object <<= Group)
-    | (Member <<= Group)
-    | (Group <<= wf_parse_tokens++)
-    ;
+    inline const auto wf_parse =
+      (Top <<= File)
+      | (File <<= Group)
+      | (Array <<= Comma)
+      | (Object <<= Comma)
+      | (Comma <<= (Group|Member)++)
+      | (Member <<= Group++)
+      | (Group <<= (Comma|wf_parse_tokens|Member)++)
+      ;
     // clang-format on
 
     inline const auto wf_value_tokens =
       Object | Array | String | Number | True | False | Null;
 
     // clang-format off
-  inline const auto wf_groups =
-    (Top <<= wf_value_tokens)
-    | (Object <<= ObjectGroup)
-    | (Array <<= ArrayGroup)
-    | (ObjectGroup <<= (wf_value_tokens | Colon | Comma)++)
-    | (ArrayGroup <<= (wf_value_tokens | Comma)++)
-    ;
-    // clang-format on
-
-    // clang-format off
-  inline const auto wf_structure =
-    (Top <<= wf_value_tokens)
-    | (Object <<= Member++)
-    | (Member <<= String * (Value >>= wf_value_tokens))
-    | (Array <<= wf_value_tokens++)
-    ;
+    inline const auto wf_groups =
+      (Top <<= wf_value_tokens)
+      | (Object <<= Member++)
+      | (Array <<= wf_value_tokens++)
+      | (Member <<= String * (Value >>= wf_value_tokens))
+      ;
     // clang-format on
 
     inline auto err(Node node, const std::string& msg)

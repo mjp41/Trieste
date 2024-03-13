@@ -131,10 +131,10 @@ namespace trieste
         node = node->back();
       }
 
-      void pop(const Token& type)
+      void pop(const Token& type, std::string error = "")
       {
         if (!try_pop(type))
-          invalid();
+          invalid(error);
       }
 
       void term(std::initializer_list<Token> end = {})
@@ -163,9 +163,10 @@ namespace trieste
           add(type, index);
       }
 
-      void invalid()
+      void invalid(std::string)
       {
-        extend(Invalid);
+        // Do something with error here.
+        extend(Error);
       }
 
     private:
@@ -406,7 +407,7 @@ namespace trieste
 
         if (!matched)
         {
-          make.invalid();
+          make.invalid("Unable to parse!");
           make.re_iterator.skip();
         }
       }

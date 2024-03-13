@@ -36,73 +36,49 @@ namespace trieste::json
     PassDef groups = {
       "groups",
       wf_groups,
-      dir::bottomup,
+      dir::bottomup | dir::once,
       {
-        In(Array) * T(Group)[Group] >>
-          [](Match& _) { return ArrayGroup << *_[Group]; },
+        (T(Group) << (Any[Group] * End)) >>
+          [](Match& _) { return _(Group); },
 
-        In(Object) * T(Group)[Group] >>
-          [](Match& _) { return ObjectGroup << *_[Group]; },
-
-        In(Top) *
-            (T(File) << ((T(Group) << (ValueToken[Value] * End)) * End)) >>
+        In(Top) * (T(File) << (ValueToken[Value] * End)) >>
           [](Match& _) { return _(Value); },
 
-        // errors
+        In(Array) * (T(Comma) << ((T(Group) << End) * ValueToken++[Value] * End)) >>
+          [](Match& _) { return Seq << _[Value]; },
+
+        In(Object) * (T(Comma) << ((T(Group) << End) * T(Member)++[Member] * End)) >>
+          [](Match& _) { return Seq << _[Member]; },
+
         In(Top) * T(File)[File] >>
           [](Match& _) { return err(_[File], "Invalid JSON"); },
 
-        In(ArrayGroup) * T(Colon)[Colon] >>
-          [](Match& _) { return err(_[Colon], "Invalid colon in array"); },
+        In(Array) * T(Comma)[Comma] >>
+          [](Match& _) { return err(_[Comma], "Cannot parse array body!"); },
+
+        In(Object) * (T(Comma)[Comma]) >>
+          [](Match& _) { return err(_[Member], "Cannot parse object body!"); },
+
+        (T(Member)[Member] << --(T(String) * ValueToken * End)) >>
+          [](Match& _) { return err(_[Member], "Invalid member!"); },
+
+        In(Object) * (!T(Member))[Member] >> 
+          [](Match& _) { return err(_[Member], "Invalid member!"); },
+
+        In(Array) * (!ValueToken)[Value] >> 
+          [](Match& _) { return err(_[Value], "Invalid value in array!"); },
       }};
+
+    groups.post([&](Node n) {
+      return invalid_tokens(
+        n, {{Comma, "Invalid parsing"}, {trieste::Invalid, "Unable to parse here!"}, {Group, "Invalid parsing"}});
+    });
 
     return groups;
   }
 
-  PassDef structure()
-  {
-    PassDef structure = {
-      "structure",
-      wf_structure,
-      dir::bottomup,
-      {
-        In(ArrayGroup) * (Start * ValueToken[Value]) >>
-          [](Match& _) { return (Value << _(Value)); },
-
-        In(ArrayGroup) * (T(Value)[Lhs] * T(Comma) * ValueToken[Rhs]) >>
-          [](Match& _) { return Seq << _(Lhs) << (Value << _(Rhs)); },
-
-        In(Array) * (T(ArrayGroup) << (T(Value)++[Array] * End)) >>
-          [](Match& _) { return Seq << _[Array]; },
-
-        In(Array) * T(Value)[Value] >>
-          [](Match& _) { return _(Value)->front(); },
-
-        In(ObjectGroup) *
-            (Start * T(String)[Lhs] * T(Colon) * ValueToken[Rhs]) >>
-          [](Match& _) { return (Member << _(Lhs) << _(Rhs)); },
-
-        In(ObjectGroup) *
-            (T(Member)[Member] * T(Comma) * T(String)[Lhs] * T(Colon) *
-             ValueToken[Rhs]) >>
-          [](Match& _) {
-            return Seq << _(Member) << (Member << _(Lhs) << _(Rhs));
-          },
-
-        In(Object) * (T(ObjectGroup) << (T(Member)++[Object] * End)) >>
-          [](Match& _) { return Seq << _[Object]; },
-      }};
-
-    structure.post([&](Node n) {
-      return invalid_tokens(
-        n, {{ObjectGroup, "Invalid object"}, {ArrayGroup, "Invalid array"}});
-    });
-
-    return structure;
-  };
-
   std::vector<Pass> passes()
   {
-    return {groups(), structure()};
+    return {groups()};
   }
 }

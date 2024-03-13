@@ -5,64 +5,58 @@ namespace trieste::json
   Parse parser()
   {
     Parse p(depth::file, wf_parse);
-    std::shared_ptr<std::vector<char>> stack =
-      std::make_shared<std::vector<char>>();
+    auto depth = std::make_shared<int>(0);
 
     p("start",
       {"[ \r\n\t]+" >> [](auto&) { return; },
 
-       ":" >> [](auto& m) { m.add(Colon); },
+       ":" >> [](auto& m) { m.seq(Member); },
 
-       "," >> [](auto& m) { m.add(Comma); },
+       "," >> [](auto& m) {
+          m.seq(Comma, {Member});
+          //  Push a group as ',' is a separator, and not a terminator
+          //  An empty group at the end can be used to detect trailing commas
+          m.push(Group);
+        },
 
        "{" >>
-         [stack](auto& m) {
-           if (stack->size() > 500)
+         [depth](auto& m) {
+           if ((*depth)++ > 500)
            {
              // TODO: Remove this once Trieste can handle deeper stacks
              m.error("Too many nested objects");
              return;
            }
            m.push(Object);
-           m.push(Group);
-           stack->push_back('{');
+           // Begin sequence to not have a nested group, this means we will need to match
+           // this empty first element of Comma, but gives a better WF definition.
+           m.seq(Comma);
          },
 
        "}" >>
-         [stack](auto& m) {
-           if (stack->empty() || stack->back() != '{')
-           {
-             m.error("Mismatched braces");
-             return;
-           }
-           stack->pop_back();
-           m.term();
-           m.pop(Object);
+         [depth](auto& m) {
+          (*depth)--;
+           m.term({Member, Comma});
+           m.pop(Object, "Unexpected '}'!");
          },
 
        R"(\[)" >>
-         [stack](auto& m) {
-           if (stack->size() > 500)
+         [depth](auto& m) {
+           if ((*depth)++ > 500)
            {
              // TODO: Remove this once Trieste can handle deeper stacks
              m.error("Too many nested objects");
              return;
            }
            m.push(Array);
-           m.push(Group);
-           stack->push_back('[');
+           m.seq(Comma);
          },
 
        "]" >>
-         [stack](auto& m) {
-           if (stack->empty() || stack->back() != '[')
-           {
-             m.error("Mismatched brackets");
-             return;
-           }
-           stack->pop_back();
-           m.term();
-           m.pop(Array);
+         [depth](auto& m) {
+          (*depth)--;
+           m.term({Comma});
+           m.pop(Array, "Unexpected ']'!");
          },
 
        "true" >> [](auto& m) { m.add(True); },
@@ -92,13 +86,6 @@ namespace trieste::json
          [](auto& m) { m.add(String); },
 
        "." >> [](auto& m) { m.error("Invalid character"); }});
-
-    p.done([stack](auto& m) {
-      if (!stack->empty())
-      {
-        m.error("Mismatched braces or brackets");
-      }
-    });
 
     return p;
   }
