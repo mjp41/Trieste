@@ -66,21 +66,7 @@ namespace trieste
   }
 
   template<typename T>
-  struct intrusive_refcounted_traits
-  {
-    static constexpr void intrusive_inc_ref(T* ptr)
-    {
-      ptr->intrusive_inc_ref();
-    }
-
-    static constexpr void intrusive_dec_ref(T* ptr)
-    {
-      ptr->intrusive_dec_ref();
-    }
-  };
-
-  template<typename T>
-  struct intrusive_ptr final
+  struct intrusive_ptr
   {
   private:
     T* ptr;
@@ -89,7 +75,7 @@ namespace trieste
     {
       if (ptr)
       {
-        intrusive_refcounted_traits<T>::intrusive_inc_ref(ptr);
+        ptr->intrusive_inc_ref();
       }
     }
 
@@ -97,7 +83,7 @@ namespace trieste
     {
       if (ptr)
       {
-        intrusive_refcounted_traits<T>::intrusive_dec_ref(ptr);
+        ptr->intrusive_dec_ref();
         ptr = nullptr;
       }
     }
@@ -250,7 +236,7 @@ namespace trieste
 
   public:
     template<typename>
-    friend struct intrusive_refcounted_traits;
+    friend struct intrusive_ptr;
 
     constexpr intrusive_ptr<T> intrusive_ptr_from_this()
     {
