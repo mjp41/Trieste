@@ -19,3 +19,12 @@ add_executable(trieste_source_test
 target_link_libraries(trieste_source_test trieste::trieste)
 
 add_test(NAME trieste_source_test COMMAND trieste_source_test --depth 6 WORKING_DIRECTORY $<TARGET_FILE_DIR:trieste_source_test>)
+
+
+add_executable(trieste_rewrite_test
+  rewrite_test.cc
+)
+
+target_link_libraries(trieste_rewrite_test trieste::trieste)
+
+add_test(NAME trieste_rewrite_test COMMAND trieste_rewrite_test)
